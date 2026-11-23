@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CoachPro - Gestión de Plantilla y Entrenamientos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: contain;
+        }
+        /* Estilos personalizados para el slider táctil */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #0f172a;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.15);
+        }
+        /* Ocultar scrollbar en contenedores horizontales */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Animaciones suaves */
+        .fade-in {
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased select-none pb-24">
+
+    <!-- Contenedor Principal Mobile-First (centrado en pantallas grandes) -->
+    <div id="app" class="max-w-md mx-auto min-h-screen bg-slate-50 shadow-xl relative flex flex-col">
+        
+        <!-- Cabecera Superior Fija -->
+        <header class="bg-emerald-700 text-white px-4 py-4 sticky top-0 z-20 shadow-md flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="bg-white/20 p-2 rounded-xl">
+                    <i data-lucide="shield" class="w-6 h-6 text-emerald-100"></i>
+                </div>
+                <div>
+                    <h1 id="header-title" class="font-bold text-lg leading-tight tracking-tight">Mi Plantilla</h1>
+                    <p id="header-subtitle" class="text-xs text-emerald-100 font-medium">Gestión de equipo y rendimiento</p>
+                </div>
+            </div>
+            <!-- Botón de acción contextual en cabecera -->
+            <div id="header-actions"></div>
+        </header>
+
+        <!-- Área de Contenido Dinámico -->
+        <main id="main-content" class="flex-1 p-4 space-y-4 overflow-y-auto">
+            <!-- Las vistas se renderizan aquí mediante JS -->
+        </main>
+
+        <!-- Barra de Navegación Inferior Tipo App Móvil -->
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-slate-200 px-2 py-1.5 z-30 flex justify-around items-center shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+            <button onclick="navigateTo('squad')" id="nav-squad" class="nav-btn flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-colors w-full text-emerald-700 bg-emerald-50">
+                <i data-lucide="users" class="w-6 h-6 mb-0.5"></i>
+                <span class="text-[11px] font-semibold">Plantilla</span>
+            </button>
+            <button onclick="navigateTo('trainings')" id="nav-trainings" class="nav-btn flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-colors w-full text-slate-500 hover:bg-slate-50">
+                <i data-lucide="clipboard-check" class="w-6 h-6 mb-0.5"></i>
+                <span class="text-[11px] font-semibold">Entrenos</span>
+            </button>
+            <button onclick="navigateTo('settings')" id="nav-settings" class="nav-btn flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-colors w-full text-slate-500 hover:bg-slate-50">
+                <i data-lucide="database-backup" class="w-6 h-6 mb-0.5"></i>
+                <span class="text-[11px] font-semibold">Datos</span>
+            </button>
+        </nav>
+
+        <!-- Sistema de Notificaciones (Toast) -->
+        <div id="toast-container" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-sm pointer-events-none flex flex-col gap-2"></div>
+
+        <!-- Modal Genérico (Para formularios y confirmaciones sin usar alert/confirm) -->
+        <div id="modal-backdrop" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+            <div id="modal-box" class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl transform transition-transform max-h-[90vh] overflow-y-auto">
+                <!-- Contenido del modal -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // =========================================================================
+        // ESTADO DE LA APLICACIÓN (En memoria, precargado con datos de ejemplo)
+        // =========================================================================
+        const QUICK_IMPROVEMENT_TAGS = [
+            "Repliegue", "Primer toque", "Definición", "Perfilarse", 
+            "Comunicación", "Resistencia", "Marca individual", "Salida de balón",
+            "Concentración", "Juego aéreo", "Toma de decisiones", "Presión tras pérdida"
+        ];
+
+        const POSITIONS = [
+            "Portero",
+            "Defensa / Cierre",
+            "Medio / Ala",
+            "Delantero / Pívot"
+        ];
+
+        let state = {
+            currentView: 'squad', // 'squad', 'trainings', 'training-editor', 'player-detail', 'settings'
+            selectedPlayerId: null,
+            editingTrainingId: null,
+            squadFilter: 'Todos',
+            players: [
+                { id: 'p1', name: 'Carlos Mendoza', number: 1, position: 'Portero' },
+                { id: 'p2', name: 'Javier Ruiz', number: 4, position: 'Defensa / Cierre' },
+                { id: 'p3', name: 'Mateo Silva', number: 8, position: 'Medio / Ala' },
+                { id: 'p4', name: 'Lucas Gómez', number: 10, position: 'Medio / Ala' },
+                { id: 'p5', name: 'Diego Torres', number: 9, position: 'Delantero / Pívot' }
+            ],
+            trainings: [
+                {
+                    id: 't1',
+                    date: new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0],
+                    title: 'Transiciones defensa-ataque y finalización',
+                    evaluations: {
+                        'p1': { attended: true, rating: 8.5, tags: ['Comunicación', 'Salida de balón'], notes: 'Muy atento en coberturas largas.' },
+                        'p2': { attended: true, rating: 7.0, tags: ['Perfilarse', 'Repliegue'], notes: 'Le costó girar en balones a la espalda.' },
+                        'p3': { attended: true, rating: 9.0, tags: ['Definición'], notes: 'Gran ritmo y visión de juego.' },
+                        'p4': { attended: false, rating: 6.0, tags: [], notes: '' },
+                        'p5': { attended: true, rating: 6.5, tags: ['Primer toque', 'Definición'], notes: 'Precipitado en el último pase.' }
+                    }
+                },
+                {
+                    id: 't2',
+                    date: new Date(Date.now() - 86400000 * 1).toISOString().split('T')[0],
+                    title: 'Presión alta y balón parado',
+                    evaluations: {
+                        'p1': { attended: true, rating: 8.0, tags: ['Juego aéreo'], notes: 'Seguro por alto.' },
+                        'p2': { attended: true, rating: 8.5, tags: ['Marca individual'], notes: 'Muy contundente al corte.' },
+                        'p3': { attended: true, rating: 7.5, tags: ['Presión tras pérdida'], notes: 'Bajó el ritmo en los últimos 15 min.' },
+                        'p4': { attended: true, rating: 9.0, tags: ['Toma de decisiones'], notes: 'Excelente ejecución en estrategia.' },
+                        'p5': { attended: true, rating: 7.5, tags: ['Repliegue', 'Resistencia'], notes: 'Mejoró la definición, debe ayudar más atrás.' }
+                    }
+                }
+            ]
+        };
+
+        // Borrador temporal para crear/editar un entrenamiento
+        let trainingDraft = null;
+
+        // =========================================================================
+        // UTILIDADES Y CÁLCULOS
+        // =========================================================================
+        function generateId(prefix = 'id') {
+            return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        }
+
+        function getPlayerStats(playerId) {
+            let totalRating = 0;
+            let count = 0;
+            const history = [];
+            const improvementMap = {};
+
+            // Ordenar entrenamientos del más reciente al más antiguo
+            const sortedTrainings = [...state.trainings].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            sortedTrainings.forEach(t => {
+                const ev = t.evaluations[playerId];
+                if (ev && ev.attended) {
+                    totalRating += Number(ev.rating);
+                    count++;
+                    history.push({
+                        trainingId: t.id,
+                        date: t.date,
+                        title: t.title,
+                        rating: Number(ev.rating),
+                        tags: ev.tags || [],
+                        notes: ev.notes || ''
+                    });
+
+                    (ev.tags || []).forEach(tag => {
+                        improvementMap[tag] = (improvementMap[tag] || 0) + 1;
+                    });
+                }
+            });
+
+            const average = count > 0 ? (totalRating / count).toFixed(1) : null;
+            // Ordenar puntos a mejorar por frecuencia
+            const topImprovements = Object.entries(improvementMap)
+                .sort((a, b) => b[1] - a[1])
+                .map(([tag, freq]) => ({ tag, freq }));
+
+            return { average, count, history, topImprovements };
+        }
+
+        function getRatingBadgeStyle(rating) {
+            if (rating === null || rating === undefined) return 'bg-slate-100 text-slate-500 border-slate-200';
+            const num = Number(rating);
+            if (num >= 8.5) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+            if (num >= 7.0) return 'bg-teal-100 text-teal-800 border-teal-300';
+            if (num >= 5.0) return 'bg-amber-100 text-amber-800 border-amber-300';
+            return 'bg-rose-100 text-rose-800 border-rose-300';
+        }
+
+        function getRatingTextColor(rating) {
+            const num = Number(rating);
+            if (num >= 8.5) return 'text-emerald-600';
+            if (num >= 7.0) return 'text-teal-600';
+            if (num >= 5.0) return 'text-amber-600';
+            return 'text-rose-600';
+        }
+
+        function getPositionBadgeColor(pos) {
+            if (pos.includes('Portero')) return 'bg-amber-100 text-amber-800';
+            if (pos.includes('Defensa')) return 'bg-blue-100 text-blue-800';
+            if (pos.includes('Medio')) return 'bg-emerald-100 text-emerald-800';
+            return 'bg-rose-100 text-rose-800';
+        }
+
+        function formatDateES(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-rose-600' : (type === 'info' ? 'bg-slate-800' : 'bg-emerald-700');
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-2xl shadow-lg text-sm font-medium flex items-center justify-between fade-in`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2800);
+        }
+
+        // =========================================================================
+        // NAVEGACIÓN Y CONTROL DE VISTAS
+        // =========================================================================
+        function navigateTo(view, param = null) {
+            state.currentView = view;
+            if (view === 'player-detail') state.selectedPlayerId = param;
+            if (view === 'training-editor') state.editingTrainingId = param;
+
+            // Actualizar barra inferior
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-700', 'bg-emerald-50');
+                btn.classList.add('text-slate-500');
+            });
+
+            if (view === 'squad' || view === 'player-detail') {
+                const btn = document.getElementById('nav-squad');
+                btn.classList.add('text-emerald-700', 'bg-emerald-50');
+                btn.classList.remove('text-slate-500');
+            } else if (view === 'trainings' || view === 'training-editor') {
+                const btn = document.getElementById('nav-trainings');
+                btn.classList.add('text-emerald-700', 'bg-emerald-50');
+                btn.classList.remove('text-slate-500');
+            } else if (view === 'settings') {
+                const btn = document.getElementById('nav-settings');
+                btn.classList.add('text-emerald-700', 'bg-emerald-50');
+                btn.classList.remove('text-slate-500');
+            }
+
+            render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function render() {
+            const main = document.getElementById('main-content');
+            const headerTitle = document.getElementById('header-title');
+            const headerSubtitle = document.getElementById('header-subtitle');
+            const headerActions = document.getElementById('header-actions');
+
+            headerActions.innerHTML = '';
+
+            if (state.currentView === 'squad') {
+                headerTitle.textContent = 'Mi Plantilla';
+                headerSubtitle.textContent = `${state.players.length} jugadores inscritos`;
+                headerActions.innerHTML = `
+                    <button onclick="openPlayerModal()" class="bg-white text-emerald-800 hover:bg-emerald-50 active:scale-95 transition-all font-bold text-sm px-3.5 py-2 rounded-xl shadow-sm flex items-center gap-1.5">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        <span>Añadir</span>
+                    </button>
+                `;
+                renderSquadView(main);
+            } 
+            else if (state.currentView === 'player-detail') {
+                const player = state.players.find(p => p.id === state.selectedPlayerId);
+                if (!player) return navigateTo('squad');
+                headerTitle.textContent = player.name;
+                headerSubtitle.textContent = `Dorsal #${player.number} • ${player.position}`;
+                headerActions.innerHTML = `
+                    <button onclick="navigateTo('squad')" class="bg-emerald-800/60 hover:bg-emerald-800 text-white p-2 rounded-xl transition-colors">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                `;
+                renderPlayerDetailView(main, player);
+            } 
+            else if (state.currentView === 'trainings') {
+                headerTitle.textContent = 'Entrenamientos';
+                headerSubtitle.textContent = `${state.trainings.length} sesiones registradas`;
+                headerActions.innerHTML = `
+                    <button onclick="startNewTraining()" class="bg-white text-emerald-800 hover:bg-emerald-50 active:scale-95 transition-all font-bold text-sm px-3.5 py-2 rounded-xl shadow-sm flex items-center gap-1.5">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Nueva Sesión</span>
+                    </button>
+                `;
+                renderTrainingsView(main);
+            } 
+            else if (state.currentView === 'training-editor') {
+                headerTitle.textContent = state.editingTrainingId ? 'Editar Sesión' : 'Nueva Sesión';
+                headerSubtitle.textContent = 'Asistencia, notas y mejoras';
+                headerActions.innerHTML = `
+                    <button onclick="navigateTo('trainings')" class="bg-emerald-800/60 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl text-sm font-medium">
+                        Cancelar
+                    </button>
+                `;
+                renderTrainingEditorView(main);
+            } 
+            else if (state.currentView === 'settings') {
+                headerTitle.textContent = 'Copia de Seguridad';
+                headerSubtitle.textContent = 'Exportar e importar datos JSON';
+                renderSettingsView(main);
+            }
+
+            lucide.createIcons();
+        }
+
+        // =========================================================================
+        // VISTA 1: PLANTILLA
+        // =========================================================================
+        function renderSquadView(container) {
+            const filters = ['Todos', ...POSITIONS];
+            const filteredPlayers = state.squadFilter === 'Todos' 
+                ? state.players 
+                : state.players.filter(p => p.position === state.squadFilter);
+
+            // Ordenar por dorsal
+            filteredPlayers.sort((a, b) => Number(a.number) - Number(b.number));
+
+            let html = `
+                <!-- Filtros por posición -->
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    ${filters.map(f => `
+                        <button onclick="setSquadFilter('${f}')" 
+                            class="px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${state.squadFilter === f ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'}">
+                            ${f}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+
+            if (filteredPlayers.length === 0) {
+                html += `
+                    <div class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 shadow-xs mt-4 fade-in">
+                        <div class="w-14 h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="users" class="w-7 h-7"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-base">Sin jugadores aquí</h3>
+                        <p class="text-sm text-slate-500 mt-1 mb-4">Añade jugadores a tu plantilla para empezar a evaluar sus entrenamientos.</p>
+                        <button onclick="openPlayerModal()" class="bg-emerald-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-sm active:scale-95 transition-transform">
+                            + Añadir Jugador
+                        </button>
+                    </div>
+                `;
+            } else {
+                html += `<div class="space-y-3 fade-in">`;
+                filteredPlayers.forEach(player => {
+                    const stats = getPlayerStats(player.id);
+                    const avgDisplay = stats.average !== null ? stats.average : '-';
+                    const badgeStyle = getRatingBadgeStyle(stats.average);
+                    const posBadge = getPositionBadgeColor(player.position);
+
+                    html += `
+                        <div onclick="navigateTo('player-detail', '${player.id}')" 
+                             class="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs active:scale-[0.99] transition-all cursor-pointer flex items-center justify-between gap-3">
+                            
+                            <div class="flex items-center gap-3.5 min-w-0">
+                                <!-- Dorsal estilo camiseta -->
+                                <div class="w-12 h-12 rounded-2xl bg-slate-900 text-white flex flex-col items-center justify-center shrink-0 shadow-xs">
+                                    <span class="text-[10px] text-slate-400 font-bold uppercase leading-none">Nº</span>
+                                    <span class="text-lg font-extrabold leading-tight">${player.number}</span>
+                                </div>
+                                
+                                <div class="min-w-0">
+                                    <h3 class="font-bold text-slate-900 text-base truncate">${player.name}</h3>
+                                    <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md ${posBadge}">
+                                            ${player.position}
+                                        </span>
+                                        <span class="text-xs text-slate-500 font-medium">
+                                            • ${stats.count} ${stats.count === 1 ? 'sesión' : 'sesiones'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Nota Media Acumulada -->
+                            <div class="flex items-center gap-2 shrink-0">
+                                <div class="flex flex-col items-center justify-center px-3 py-1.5 rounded-xl border ${badgeStyle}">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider opacity-80">Media</span>
+                                    <span class="text-base font-extrabold leading-none mt-0.5">${avgDisplay}</span>
+                                </div>
+                                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function setSquadFilter(filter) {
+            state.squadFilter = filter;
+            render();
+        }
+
+        // Modal para Añadir / Editar Jugador
+        function openPlayerModal(playerId = null) {
+            const player = playerId ? state.players.find(p => p.id === playerId) : null;
+            const modalBackdrop = document.getElementById('modal-backdrop');
+            const modalBox = document.getElementById('modal-box');
+
+            modalBox.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-900">${player ? 'Editar Jugador' : 'Nuevo Jugador'}</h2>
+                    <button onclick="closeModal()" class="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <form onsubmit="savePlayer(event, '${playerId || ''}')" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Nombre completo</label>
+                        <input type="text" id="player-name" required placeholder="Ej. Álvaro Morata" value="${player ? player.name : ''}"
+                            class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none text-base font-medium">
+                    </div>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-1">
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Dorsal</label>
+                            <input type="number" id="player-number" required min="1" max="99" placeholder="10" value="${player ? player.number : ''}"
+                                class="w-full px-3 py-3 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none text-base font-bold text-center">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1.5">Posición</label>
+                            <select id="player-position" class="w-full px-3 py-3 rounded-xl border border-slate-300 focus:border-emerald-600 outline-none text-base font-medium bg-white">
+                                ${POSITIONS.map(pos => `<option value="${pos}" ${player && player.position === pos ? 'selected' : ''}>${pos}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex gap-2">
+                        <button type="button" onclick="closeModal()" class="flex-1 py-3.5 rounded-xl font-bold text-slate-600 bg-slate-100 active:scale-95 transition-transform">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="flex-1 py-3.5 rounded-xl font-bold text-white bg-emerald-600 shadow-md active:scale-95 transition-transform">
+                            Guardar
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            modalBackdrop.classList.remove('hidden');
+            lucide.createIcons();
+            setTimeout(() => document.getElementById('player-name').focus(), 100);
+        }
+
+        function savePlayer(e, playerId) {
+            e.preventDefault();
+            const name = document.getElementById('player-name').value.trim();
+            const number = parseInt(document.getElementById('player-number').value, 10);
+            const position = document.getElementById('player-position').value;
+
+            if (!name || isNaN(number)) return;
+
+            if (playerId) {
+                const idx = state.players.findIndex(p => p.id === playerId);
+                if (idx !== -1) {
+                    state.players[idx] = { ...state.players[idx], name, number, position };
+                    showToast('Jugador actualizado');
+                }
+            } else {
+                state.players.push({
+                    id: generateId('p'),
+                    name,
+                    number,
+                    position
+                });
+                showToast('Jugador añadido a la plantilla');
+            }
+
+            closeModal();
+            render();
+        }
+
+        function confirmDeletePlayer(playerId) {
+            const player = state.players.find(p => p.id === playerId);
+            if (!player) return;
+
+            const modalBackdrop = document.getElementById('modal-backdrop');
+            const modalBox = document.getElementById('modal-box');
+
+            modalBox.innerHTML = `
+                <div class="text-center p-2">
+                    <div class="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i data-lucide="trash-2" class="w-7 h-7"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">¿Eliminar a ${player.name}?</h3>
+                    <p class="text-sm text-slate-500 mt-1 mb-5">Se perderá su ficha en la plantilla, aunque las sesiones pasadas seguirán guardadas.</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeModal()" class="flex-1 py-3 rounded-xl font-bold text-slate-700 bg-slate-100">Cancelar</button>
+                        <button onclick="deletePlayer('${player.id}')" class="flex-1 py-3 rounded-xl font-bold text-white bg-rose-600 shadow-sm">Sí, eliminar</button>
+                    </div>
+                </div>
+            `;
+            modalBackdrop.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function deletePlayer(playerId) {
+            state.players = state.players.filter(p => p.id !== playerId);
+            closeModal();
+            showToast('Jugador eliminado', 'info');
+            navigateTo('squad');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-backdrop').classList.add('hidden');
+        }
+
+        // =========================================================================
+        // VISTA 2: DETALLE DEL JUGADOR
+        // =========================================================================
+        function renderPlayerDetailView(container, player) {
+            const stats = getPlayerStats(player.id);
+            const badgeStyle = getRatingBadgeStyle(stats.average);
+
+            let html = `
+                <div class="fade-in space-y-4">
+                    <!-- Tarjeta Resumen -->
+                    <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-xs">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-14 h-14 rounded-2xl bg-slate-900 text-white flex flex-col items-center justify-center font-extrabold text-xl">
+                                    #${player.number}
+                                </div>
+                                <div>
+                                    <span class="text-xs font-bold px-2.5 py-1 rounded-lg ${getPositionBadgeColor(player.position)}">
+                                        ${player.position}
+                                    </span>
+                                    <p class="text-xs text-slate-500 mt-1.5 font-medium">Asistencia: <strong class="text-slate-800">${stats.count}</strong> de ${state.trainings.length} sesiones</p>
+                                </div>
+                            </div>
+                            <div class="text-center px-4 py-2 rounded-2xl border ${badgeStyle}">
+                                <span class="block text-[10px] font-bold uppercase">Nota Media</span>
+                                <span class="text-2xl font-black">${stats.average !== null ? stats.average : '-'}</span>
+                            </div>
+                        </div>
+
+                        <!-- Botones Editar / Eliminar Jugador -->
+                        <div class="flex gap-2 pt-3">
+                            <button onclick="openPlayerModal('${player.id}')" class="flex-1 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i> Editar Ficha
+                            </button>
+                            <button onclick="confirmDeletePlayer('${player.id}')" class="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Áreas a Mejorar Acumuladas -->
+                    <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-xs">
+                        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2 mb-3">
+                            <i data-lucide="target" class="w-4 h-4 text-amber-500"></i>
+                            Puntos a mejorar acumulados
+                        </h3>
+                        ${stats.topImprovements.length === 0 
+                            ? `<p class="text-xs text-slate-400 italic">Aún no hay aspectos de mejora registrados para este jugador.</p>`
+                            : `<div class="flex flex-wrap gap-2">
+                                ${stats.topImprovements.map(item => `
+                                    <span class="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-xl text-xs font-semibold">
+                                        ${item.tag}
+                                        <span class="bg-amber-200 text-amber-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full">${item.freq}x</span>
+                                    </span>
+                                `).join('')}
+                               </div>`
+                        }
+                    </div>
+
+                    <!-- Historial Cronológico -->
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm px-1 mb-2.5 flex items-center gap-2">
+                            <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i>
+                            Historial de Entrenamientos
+                        </h3>
+                        ${stats.history.length === 0 
+                            ? `<div class="bg-white rounded-2xl p-6 text-center border border-slate-200 text-xs text-slate-500">No ha asistido a ningún entrenamiento registrado.</div>`
+                            : `<div class="space-y-3">
+                                ${stats.history.map(h => `
+                                    <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+                                        <div class="flex justify-between items-start gap-2">
+                                            <div>
+                                                <span class="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">${formatDateES(h.date)}</span>
+                                                <h4 class="font-bold text-slate-900 text-sm mt-0.5">${h.title}</h4>
+                                            </div>
+                                            <span class="px-2.5 py-1 rounded-xl font-extrabold text-sm border ${getRatingBadgeStyle(h.rating)}">
+                                                ${h.rating.toFixed(1)}
+                                            </span>
+                                        </div>
+                                        ${h.tags.length > 0 ? `
+                                            <div class="flex flex-wrap gap-1.5 mt-2.5">
+                                                ${h.tags.map(t => `<span class="text-[11px] font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">${t}</span>`).join('')}
+                                            </div>
+                                        ` : ''}
+                                        ${h.notes ? `
+                                            <p class="mt-2.5 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                "${h.notes}"
+                                            </p>
+                                        ` : ''}
+                                    </div>
+                                `).join('')}
+                               </div>`
+                        }
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // =========================================================================
+        // VISTA 3: LISTA DE ENTRENAMIENTOS
+        // =========================================================================
+        function renderTrainingsView(container) {
+            const sortedTrainings = [...state.trainings].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (sortedTrainings.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-3xl p-8 text-center border border-slate-200/80 shadow-xs mt-4 fade-in">
+                        <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="clipboard-list" class="w-7 h-7"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-base">Sin entrenamientos</h3>
+                        <p class="text-sm text-slate-500 mt-1 mb-4">Crea tu primera sesión para pasar lista y puntuar a tus jugadores.</p>
+                        <button onclick="startNewTraining()" class="bg-emerald-600 text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-sm active:scale-95 transition-transform">
+                            + Crear Entrenamiento
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `<div class="space-y-3 fade-in">`;
+            sortedTrainings.forEach(t => {
+                // Calcular asistentes y nota media de la sesión
+                let attendees = 0;
+                let sum = 0;
+                Object.values(t.evaluations).forEach(ev => {
+                    if (ev.attended) {
+                        attendees++;
+                        sum += Number(ev.rating);
+                    }
+                });
+                const sessionAvg = attendees > 0 ? (sum / attendees).toFixed(1) : '-';
+
+                html += `
+                    <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs">
+                        <div class="flex justify-between items-start gap-2">
+                            <div onclick="editTraining('${t.id}')" class="cursor-pointer flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
+                                        ${formatDateES(t.date)}
+                                    </span>
+                                    <span class="text-xs text-slate-500 font-medium">
+                                        ${attendees} asistentes
+                                    </span>
+                                </div>
+                                <h3 class="font-bold text-slate-900 text-base mt-1.5 leading-snug">${t.title}</h3>
+                            </div>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="px-2.5 py-1 rounded-xl text-xs font-extrabold border ${getRatingBadgeStyle(sessionAvg === '-' ? null : sessionAvg)}">
+                                    Media: ${sessionAvg}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <button onclick="confirmDeleteTraining('${t.id}')" class="p-2 text-rose-500 hover:bg-rose-50 rounded-xl text-xs font-semibold flex items-center gap-1">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="editTraining('${t.id}')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                                <i data-lucide="edit-2" class="w-3.5 h-3.5"></i> Evaluar / Editar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function confirmDeleteTraining(trainingId) {
+            const modalBackdrop = document.getElementById('modal-backdrop');
+            const modalBox = document.getElementById('modal-box');
+
+            modalBox.innerHTML = `
+                <div class="text-center p-2">
+                    <div class="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i data-lucide="trash-2" class="w-7 h-7"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">¿Borrar entrenamiento?</h3>
+                    <p class="text-sm text-slate-500 mt-1 mb-5">Se eliminarán todas las notas y observaciones de esta sesión.</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeModal()" class="flex-1 py-3 rounded-xl font-bold text-slate-700 bg-slate-100">Cancelar</button>
+                        <button onclick="deleteTraining('${trainingId}')" class="flex-1 py-3 rounded-xl font-bold text-white bg-rose-600 shadow-sm">Eliminar</button>
+                    </div>
+                </div>
+            `;
+            modalBackdrop.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function deleteTraining(trainingId) {
+            state.trainings = state.trainings.filter(t => t.id !== trainingId);
+            closeModal();
+            showToast('Entrenamiento eliminado', 'info');
+            render();
+        }
+
+        // =========================================================================
+        // VISTA 4: EDITOR DE ENTRENAMIENTO (EVALUACIÓN DE JUGADORES)
+        // =========================================================================
+        function startNewTraining() {
+            const today = new Date().toISOString().split('T')[0];
+            const evaluations = {};
+            state.players.forEach(p => {
+                evaluations[p.id] = {
+                    attended: true,
+                    rating: 7.0,
+                    tags: [],
+                    notes: ''
+                };
+            });
+
+            trainingDraft = {
+                id: null,
+                date: today,
+                title: '',
+                evaluations
+            };
+            navigateTo('training-editor', null);
+        }
+
+        function editTraining(trainingId) {
+            const existing = state.trainings.find(t => t.id === trainingId);
+            if (!existing) return;
+
+            // Clonar profundamente y asegurar que jugadores nuevos también aparezcan
+            const evaluations = JSON.parse(JSON.stringify(existing.evaluations));
+            state.players.forEach(p => {
+                if (!evaluations[p.id]) {
+                    evaluations[p.id] = { attended: false, rating: 7.0, tags: [], notes: '' };
+                }
+            });
+
+            trainingDraft = {
+                id: existing.id,
+                date: existing.date,
+                title: existing.title,
+                evaluations
+            };
+            navigateTo('training-editor', trainingId);
+        }
+
+        function renderTrainingEditorView(container) {
+            if (!trainingDraft) return navigateTo('trainings');
+
+            const sortedPlayers = [...state.players].sort((a, b) => Number(a.number) - Number(b.number));
+
+            let html = `
+                <div class="space-y-4 fade-in pb-6">
+                    <!-- Datos generales de la sesión -->
+                    <div class="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-xs space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha de la sesión</label>
+                            <input type="date" id="draft-date" value="${trainingDraft.date}" onchange="trainingDraft.date = this.value"
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 focus:border-emerald-600 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Título / Enfoque del entrenamiento</label>
+                            <input type="text" id="draft-title" placeholder="Ej. Posesión, presión alta y finalización" value="${trainingDraft.title}" oninput="trainingDraft.title = this.value"
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-800 focus:border-emerald-600 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between px-1">
+                        <h3 class="font-bold text-slate-800 text-sm">Evaluación Individual (${sortedPlayers.length})</h3>
+                        <span class="text-xs text-slate-500">Marca asistencia y puntúa</span>
+                    </div>
+            `;
+
+            if (sortedPlayers.length === 0) {
+                html += `<div class="bg-white p-6 rounded-2xl text-center text-sm text-slate-500">No hay jugadores en la plantilla. Añádelos primero en la pestaña Plantilla.</div>`;
+            } else {
+                sortedPlayers.forEach(player => {
+                    const ev = trainingDraft.evaluations[player.id];
+                    const isAttended = ev.attended;
+                    const ratingColor = getRatingTextColor(ev.rating);
+
+                    html += `
+                        <div class="bg-white rounded-3xl p-4 border transition-all ${isAttended ? 'border-slate-200 shadow-xs' : 'border-slate-200/50 opacity-65 bg-slate-50'}">
+                            <!-- Cabecera Jugador + Switch Asistencia -->
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3">
+                                    <span class="w-9 h-9 rounded-xl bg-slate-900 text-white font-extrabold text-sm flex items-center justify-center">
+                                        ${player.number}
+                                    </span>
+                                    <div>
+                                        <h4 class="font-bold text-slate-900 text-sm leading-tight">${player.name}</h4>
+                                        <span class="text-[11px] text-slate-500 font-medium">${player.position}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Botón Táctil de Asistencia -->
+                                <button type="button" onclick="toggleDraftAttendance('${player.id}')"
+                                    class="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${isAttended ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-200 text-slate-600'}">
+                                    <i data-lucide="${isAttended ? 'check-circle-2' : 'x-circle'}" class="w-4 h-4"></i>
+                                    <span>${isAttended ? 'Asiste' : 'Falta'}</span>
+                                </button>
+                            </div>
+
+                            <!-- Controles de Puntuación y Mejora (solo si asiste) -->
+                            ${isAttended ? `
+                                <div class="mt-4 pt-3.5 border-t border-slate-100 space-y-4">
+                                    <!-- Slider Nota 1 a 10 -->
+                                    <div>
+                                        <div class="flex justify-between items-center mb-1.5">
+                                            <span class="text-xs font-bold text-slate-600 uppercase">Valoración Sesión</span>
+                                            <span id="rating-val-${player.id}" class="text-xl font-black ${ratingColor}">
+                                                ${Number(ev.rating).toFixed(1)}
+                                            </span>
+                                        </div>
+                                        <input type="range" min="1" max="10" step="0.5" value="${ev.rating}"
+                                            oninput="updateDraftRating('${player.id}', this.value)"
+                                            class="w-full cursor-pointer">
+                                        <div class="flex justify-between text-[10px] text-slate-400 font-bold mt-1 px-0.5">
+                                            <span>1 (Bajo)</span>
+                                            <span>5 (Correcto)</span>
+                                            <span>10 (Excelente)</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Etiquetas Rápidas: Qué debe mejorar -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-600 uppercase mb-2">¿Qué debe mejorar? (Toca para marcar)</label>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            ${QUICK_IMPROVEMENT_TAGS.map(tag => {
+                                                const active = ev.tags.includes(tag);
+                                                return `
+                                                    <button type="button" onclick="toggleDraftTag('${player.id}', '${tag}')"
+                                                        class="px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${active ? 'bg-amber-500 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                                                        ${active ? '✓ ' : '+ '}${tag}
+                                                    </button>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                    </div>
+
+                                    <!-- Observaciones texto libre -->
+                                    <div>
+                                        <input type="text" placeholder="Nota adicional (ej. Muy bien en el 1vs1, mejorar perfil...)" 
+                                            value="${ev.notes}" oninput="trainingDraft.evaluations['${player.id}'].notes = this.value"
+                                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:border-emerald-600 outline-none">
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                    <!-- Botón Guardar Sesión -->
+                    <div class="pt-2">
+                        <button onclick="saveTrainingSession()" class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-extrabold text-base rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
+                            <i data-lucide="save" class="w-5 h-5"></i>
+                            <span>Guardar Entrenamiento</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function toggleDraftAttendance(playerId) {
+            trainingDraft.evaluations[playerId].attended = !trainingDraft.evaluations[playerId].attended;
+            render();
+        }
+
+        function updateDraftRating(playerId, val) {
+            const num = parseFloat(val);
+            trainingDraft.evaluations[playerId].rating = num;
+            const label = document.getElementById(`rating-val-${playerId}`);
+            if (label) {
+                label.textContent = num.toFixed(1);
+                label.className = `text-xl font-black ${getRatingTextColor(num)}`;
+            }
+        }
+
+        function toggleDraftTag(playerId, tag) {
+            const tags = trainingDraft.evaluations[playerId].tags;
+            const idx = tags.indexOf(tag);
+            if (idx === -1) {
+                tags.push(tag);
+            } else {
+                tags.splice(idx, 1);
+            }
+            render();
+        }
+
+        function saveTrainingSession() {
+            if (!trainingDraft.date) {
+                showToast('Selecciona una fecha válida', 'error');
+                return;
+            }
+            const title = trainingDraft.title.trim() || `Entrenamiento ${formatDateES(trainingDraft.date)}`;
+            
+            if (trainingDraft.id) {
+                const idx = state.trainings.findIndex(t => t.id === trainingDraft.id);
+                if (idx !== -1) {
+                    state.trainings[idx] = { ...trainingDraft, title };
+                }
+                showToast('Sesión actualizada correctamente');
+            } else {
+                state.trainings.push({
+                    ...trainingDraft,
+                    id: generateId('t'),
+                    title
+                });
+                showToast('Entrenamiento guardado');
+            }
+
+            trainingDraft = null;
+            navigateTo('trainings');
+        }
+
+        // =========================================================================
+        // VISTA 5: EXPORTAR E IMPORTAR JSON (COPIA DE SEGURIDAD)
+        // =========================================================================
+        function renderSettingsView(container) {
+            container.innerHTML = `
+                <div class="space-y-4 fade-in">
+                    <!-- Resumen de datos actuales -->
+                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
+                        <h3 class="font-bold text-slate-900 text-base mb-1">Estado de los datos</h3>
+                        <p class="text-xs text-slate-500 mb-4">Guarda una copia de seguridad en tu dispositivo para no perder tus registros o transferirlos a otro móvil.</p>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-5">
+                            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">
+                                <span class="block text-2xl font-black text-slate-800">${state.players.length}</span>
+                                <span class="text-xs font-semibold text-slate-500">Jugadores</span>
+                            </div>
+                            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 text-center">
+                                <span class="block text-2xl font-black text-emerald-700">${state.trainings.length}</span>
+                                <span class="text-xs font-semibold text-slate-500">Entrenamientos</span>
+                            </div>
+                        </div>
+
+                        <!-- Botón Exportar -->
+                        <button onclick="exportDataJSON()" class="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white font-bold text-sm rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all">
+                            <i data-lucide="download" class="w-5 h-5"></i>
+                            <span>Descargar Copia (JSON)</span>
+                        </button>
+                    </div>
+
+                    <!-- Importar JSON -->
+                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
+                        <h3 class="font-bold text-slate-900 text-base mb-1">Restaurar Copia de Seguridad</h3>
+                        <p class="text-xs text-slate-500 mb-4">Selecciona un archivo <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">.json</code> exportado previamente para cargar tus jugadores y entrenamientos.</p>
+                        
+                        <label class="w-full py-3.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-2 border-dashed border-emerald-300 font-bold text-sm rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                            <i data-lucide="upload" class="w-5 h-5"></i>
+                            <span>Seleccionar archivo JSON</span>
+                            <input type="file" accept=".json,application/json" onchange="importDataJSON(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            `;
+        }
+
+        function exportDataJSON() {
+            try {
+                const payload = {
+                    app: 'CoachPro',
+                    exportedAt: new Date().toISOString(),
+                    players: state.players,
+                    trainings: state.trainings
+                };
+                const dataStr = JSON.stringify(payload, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                const dateTag = new Date().toISOString().split('T')[0];
+                a.href = url;
+                a.download = `plantilla_entrenamientos_${dateTag}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast('Copia de seguridad descargada');
+            } catch (err) {
+                showToast('Error al exportar los datos', 'error');
+            }
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed.players) && Array.isArray(parsed.trainings)) {
+                        state.players = parsed.players;
+                        state.trainings = parsed.trainings;
+                        showToast('Datos restaurados con éxito');
+                        navigateTo('squad');
+                    } else {
+                        showToast('El archivo JSON no tiene el formato válido', 'error');
+                    }
+                } catch (error) {
+                    showToast('Archivo JSON inválido o dañado', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // =========================================================================
+        // INICIALIZACIÓN
+        // =========================================================================
+        window.onload = function() {
+            render();
+        };
+    </script>
+</body>
+</html>
